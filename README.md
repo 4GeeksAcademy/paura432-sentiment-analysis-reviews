@@ -1,112 +1,65 @@
-# Data Science Project Boilerplate
+# Análisis de sentimiento en reseñas — WeLoveReviews
 
-This boilerplate is designed to kickstart data science projects by providing a basic setup for database connections, data processing, and machine learning model development. It includes a structured folder organization for your datasets and a set of pre-defined Python packages necessary for most data science tasks.
+Proyecto del módulo «Usar modelos de predicción» de 4Geeks (*Análisis de Sentimiento en Reseñas de Clientes — WeLoveReviews*), hecho sobre un fork de [`machine-learning-python-template`](https://github.com/4GeeksAcademy/machine-learning-python-template).
 
-## Structure
+La pregunta de negocio es si lo que dicen 500 reseñas escritas coincide con la puntuación media del negocio, 4,5 / 5. Se responde con un modelo de sentimiento ya entrenado de Hugging Face, sin entrenar nada. El análisis, los resultados y las conclusiones están en el notebook; este README solo explica qué hay en el repositorio y cómo ejecutarlo.
 
-The project is organized as follows:
+## Contenido
 
-- **`src/app.py`** → Main Python script where your project will run.
-- **`src/explore.ipynb`** → Notebook for exploration and testing. Once exploration is complete, migrate the clean code to `app.py`.
-- **`src/utils.py`** → Auxiliary functions, such as database connection.
-- **`requirements.txt`** → List of required Python packages.
-- **`models/`** → Will contain your SQLAlchemy model classes.
-- **`data/`** → Stores datasets at different stages:
-  - **`data/raw/`** → Raw data.
-  - **`data/interim/`** → Temporarily transformed data.
-  - **`data/processed/`** → Data ready for analysis.
+| Ruta | Qué es |
+| --- | --- |
+| `src/explore.ipynb` | Notebook ejecutado: objetivos, exploración, plan y modelo, inferencia, desglose frente al 4,5, falsos negativos, muestra revisada a mano, paso a producción, conclusiones y un anexo que compara con un segundo modelo |
+| `src/app.py` | Ruta de inferencia de producción: lee `data/raw/reviews.csv` y escribe `data/processed/reviews_with_sentiment.csv` |
+| `data/raw/reviews.csv` | Las 500 reseñas del enunciado (`review_id`, `rating`, `review_text`) |
+| `data/processed/reviews_with_sentiment.csv` | Las mismas 500 reseñas con `predicted_stars` (1–5), `sentiment` (`negative`, `neutral`, `positive`) y `confidence` |
+| `requirements.txt` | Dependencias del template más `torch` y `transformers`, todas con versión fija |
 
+El resto (`.devcontainer/`, `src/utils.py`, `.env.example`, `models/`, `data/interim/`) viene del template y este proyecto no lo usa.
 
-## ⚡ Initial Setup in Codespaces (Recommended)
+## Datos
 
-No manual setup is required, as **Codespaces is automatically configured** with the predefined files created by the academy for you. Just follow these steps:
+`data/raw/reviews.csv` es una copia sin cambios del archivo del proyecto `existing-model-sentiment-analysis-reviews` del [syllabus de 4Geeks](https://github.com/4GeeksAcademy/ai-engineering-syllabus/tree/main/content/projects/existing-model-sentiment-analysis-reviews): 500 filas, UTF-8, finales de línea CRLF. Son reseñas de ejemplo en inglés sobre un único local y no contienen datos personales.
 
-1. **Wait for the environment to configure automatically**.
-   - All necessary packages and the database will install themselves.
-   - The automatically created `username` and `db_name` are in the **`.env`** file at the root of the project.
-2. **Once Codespaces is ready, you can start working immediately**.
+`data/processed/reviews_with_sentiment.csv` lo genera `src/app.py`.
 
+## Modelo
 
-## 💻 Local Setup (Only if you can't use Codespaces)
+| | Modelo | Revisión fijada |
+| --- | --- | --- |
+| Análisis y producción | `nlptown/bert-base-multilingual-uncased-sentiment` | `8f6f4e3a8f70be4b65d3a4a8762b6d781cda240d` |
+| Anexo del notebook | `tabularisai/multilingual-sentiment-analysis` | `eea032081f8d247b4303ef3565e7cec1b6f201c9` |
 
-**Prerequisites**
+Los dos se cargan con `pipeline()` de `transformers`, una sola vez por ejecución, y se fijan por nombre y por revisión (el commit del modelo en Hugging Face). Los pesos se descargan a la caché local de Hugging Face en la primera ejecución (unos 640 MB y 520 MB); no están en el repositorio.
 
-Make sure you have Python 3.11+ installed on your machine. You will also need pip to install the Python packages.
+El modelo principal predice de 1 a 5 estrellas. Se agrupan en bandas: 1–2 `negative`, 3 `neutral`, 4–5 `positive`.
 
-**Installation**
+## Ejecución
 
-Clone the project repository to your local machine.
+En Codespaces el entorno instala `requirements.txt` al crearse. En local hace falta Python 3.11 o superior (probado con 3.12 y 3.13):
 
-Navigate to the project directory and install the required Python packages:
-
-```bash
+```sh
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Create a database (if necessary)**
+En Linux, `pip` descarga por defecto la variante de `torch` con CUDA, que ocupa varios GB. En una máquina sin GPU basta la de CPU, que se instala antes que el resto:
 
-Create a new database within the Postgres engine by customizing and executing the following command:
-
-```bash
-$ psql -U postgres -c "DO \$\$ BEGIN 
-    CREATE USER my_user WITH PASSWORD 'my_password'; 
-    CREATE DATABASE my_database OWNER my_user; 
-END \$\$;"
-```
-Connect to the Postgres engine to use your database, manipulate tables, and data:
-
-```bash
-$ psql -U my_user -d my_database
+```sh
+pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
 ```
 
-Once inside PSQL, you can create tables, run queries, insert, update, or delete data, and much more!
+La inferencia de producción clasifica las 500 reseñas en CPU y termina imprimiendo el reparto por bandas y la ruta del CSV:
 
-**Environment Variables**
-
-Create a .env file in the root directory of the project to store your environment variables, such as your database connection string:
-
-```makefile
-DATABASE_URL="postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>"
-
-#example
-DATABASE_URL="postgresql://my_user:my_password@localhost:5432/my_database"
-```
-
-## Running the Application
-
-To run the application, execute the app.py script from the root directory of the project:
-
-```bash
+```sh
 python src/app.py
 ```
 
-## Adding Models
+Para volver a ejecutar el notebook entero, con sus salidas:
 
-To add SQLAlchemy model classes, create new Python script files within the models/ directory. These classes should be defined according to your database schema.
-
-Example model definition (`models/example_model.py`):
-
-```py
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
+```sh
+jupyter nbconvert --to notebook --execute --inplace src/explore.ipynb
 ```
 
-## Working with Data
-
-You can place your raw datasets in the data/raw directory, intermediate datasets in data/interim, and processed datasets ready for analysis in data/processed.
-
-To process data, you can modify the app.py script to include your data processing steps, using pandas for data manipulation and analysis.
-
-## Contributors
-
-This template was built as part of the [Data Science and Machine Learning Bootcamp](https://4geeksacademy.com/us/coding-bootcamps/datascience-machine-learning) by 4Geeks Academy by [Alejandro Sanchez](https://twitter.com/alesanchezr) and many other contributors. Learn more about [4Geeks Academy BootCamp programs](https://4geeksacademy.com/us/programs) here.
-
-Other templates and resources like this can be found on the school's GitHub page.
+El notebook ejecuta también `src/app.py` y comprueba que el CSV de producción coincide con sus propias predicciones.
